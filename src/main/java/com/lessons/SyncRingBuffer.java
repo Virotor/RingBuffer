@@ -10,6 +10,5 @@ public class SyncRingBuffer<T> extends  AbstractRingBuffer<T>{
 
     protected SyncRingBuffer( List<T> collection,int size) {
         super(collection, size);
-/*        super(initClass,size);*/
     }
 }

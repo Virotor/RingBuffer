@@ -32,11 +32,17 @@ public abstract class AbstractRingBuffer<T> implements Collection<T> {
             if (currentReadPointer.compareAndSet(currentWritePointer.get(), currentReadPointer.get())) {
                 return null;
             }
-            return buffer.get(currentReadPointer.getAndUpdate(value -> (value + 1) % capacity));
+            synchronized (this) {
+
+                if (currentReadPointer.compareAndSet(currentWritePointer.get(), currentReadPointer.get())) {
+                    return null;
+                }
+                return buffer.get(currentReadPointer.getAndUpdate(value -> (value + 1) % capacity));
+
+            }
         } finally {
             readLock.unlock();
         }
-
     }
 
 
@@ -48,7 +54,7 @@ public abstract class AbstractRingBuffer<T> implements Collection<T> {
             if ((currentWritePointer.get() + 1) == currentReadPointer.get()) {
                 throw new IndexOutOfBoundsException("RingBuffer is overflow");
             }
-            if ( size.get() == capacity) {
+            if (size.get() == capacity) {
                 buffer.set(currentWritePointer.getAndUpdate(value -> (value + 1) % capacity), element);
                 return true;
             }
@@ -63,7 +69,7 @@ public abstract class AbstractRingBuffer<T> implements Collection<T> {
 
     @Override
     public synchronized String toString() {
-        return buffer + " WPointer = " + currentWritePointer + "  RPointer =  " + currentReadPointer;
+        return currentWritePointer + " " + currentReadPointer;
     }
 
     @Override
