@@ -1,6 +1,9 @@
 package com.lessons;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -33,12 +36,10 @@ public abstract class AbstractRingBuffer<T> implements Collection<T> {
                 return null;
             }
             synchronized (this) {
-
                 if (currentReadPointer.compareAndSet(currentWritePointer.get(), currentReadPointer.get())) {
                     return null;
                 }
                 return buffer.get(currentReadPointer.getAndUpdate(value -> (value + 1) % capacity));
-
             }
         } finally {
             readLock.unlock();
@@ -54,7 +55,7 @@ public abstract class AbstractRingBuffer<T> implements Collection<T> {
             if ((currentWritePointer.get() + 1) == currentReadPointer.get()) {
                 throw new IndexOutOfBoundsException("RingBuffer is overflow");
             }
-            if (size.get() == capacity) {
+            if (size.get() >= capacity) {
                 buffer.set(currentWritePointer.getAndUpdate(value -> (value + 1) % capacity), element);
                 return true;
             }
@@ -69,30 +70,49 @@ public abstract class AbstractRingBuffer<T> implements Collection<T> {
 
     @Override
     public synchronized String toString() {
-        return currentWritePointer + " " + currentReadPointer;
+        var readLock = lock.readLock();
+        readLock.lock();
+        try {
+            return buffer + " " + currentWritePointer + " " + currentReadPointer;
+        } finally {
+            readLock.unlock();
+        }
     }
 
     @Override
     public int size() {
-        return Math.abs(this.currentReadPointer.get() - this.currentWritePointer.get()) % 10;
+        var readLock = lock.readLock();
+        readLock.lock();
+        try {
+            return Math.abs(this.currentReadPointer.get() - this.currentWritePointer.get());
+        } finally {
+            readLock.unlock();
+        }
+
     }
 
     @Override
     public boolean isEmpty() {
-        return this.currentReadPointer.get() == currentWritePointer.get();
+        return this.currentReadPointer.compareAndSet(currentWritePointer.get(), currentReadPointer.get());
     }
 
     @Override
     public boolean contains(Object o) {
-        return buffer.contains(o);
+        var readLock = lock.readLock();
+        readLock.lock();
+        try {
+            return buffer.contains(o);
+        } finally {
+            readLock.unlock();
+        }
     }
 
     @Override
     public Iterator<T> iterator() {
-        return new Iterator<T>() {
+        return new Iterator<>() {
             @Override
             public boolean hasNext() {
-                return currentReadPointer.get() != currentWritePointer.get();
+                return currentReadPointer.compareAndSet(currentWritePointer.get(), currentReadPointer.get());
             }
 
             @Override
@@ -104,12 +124,25 @@ public abstract class AbstractRingBuffer<T> implements Collection<T> {
 
     @Override
     public Object[] toArray() {
-        return buffer.toArray();
+        var readLock = lock.readLock();
+        readLock.lock();
+        try {
+            return buffer.toArray();
+        } finally {
+            readLock.unlock();
+        }
+
     }
 
     @Override
     public <T1> T1[] toArray(T1[] a) {
-        return buffer.toArray(a);
+        var readLock = lock.readLock();
+        readLock.lock();
+        try {
+            return buffer.toArray(a);
+        } finally {
+            readLock.unlock();
+        }
     }
 
 
@@ -120,20 +153,24 @@ public abstract class AbstractRingBuffer<T> implements Collection<T> {
 
     @Override
     public boolean containsAll(Collection<?> c) {
-        for (var elem : c) {
-            if (!contains(elem)) {
-                return false;
-            }
+        var readLock = lock.readLock();
+        readLock.lock();
+        try {
+            return new HashSet<>(buffer).containsAll(c);
+        } finally {
+            readLock.unlock();
         }
-        return true;
     }
 
     @Override
     public boolean addAll(Collection<? extends T> c) {
-        for (var element : c) {
-            this.add(element);
+        var writeLock = lock.writeLock();
+        writeLock.lock();
+        try {
+            return buffer.addAll(c);
+        } finally {
+            writeLock.unlock();
         }
-        return true;
     }
 
     @Override
@@ -148,8 +185,16 @@ public abstract class AbstractRingBuffer<T> implements Collection<T> {
 
     @Override
     public void clear() {
-        this.buffer.clear();
-        this.currentWritePointer.set(0);
-        this.currentReadPointer.set(0);
+        var writeLock = lock.writeLock();
+        writeLock.lock();
+        try {
+            this.buffer.clear();
+            this.currentWritePointer.set(0);
+            this.currentReadPointer.set(0);
+            this.size.set(0);
+        } finally {
+            writeLock.unlock();
+        }
+
     }
 }

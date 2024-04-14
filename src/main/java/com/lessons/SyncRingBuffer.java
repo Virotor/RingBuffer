@@ -1,14 +1,11 @@
 package com.lessons;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 
-public class SyncRingBuffer<T> extends  AbstractRingBuffer<T>{
+public class SyncRingBuffer<T> extends AbstractRingBuffer<T> {
 
 
-    protected SyncRingBuffer( List<T> collection,int size) {
+    public SyncRingBuffer(List<T> collection, int size) {
         super(collection, size);
     }
 }
